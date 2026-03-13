@@ -1,0 +1,13 @@
+spring.application.name=evoting-backend
+spring.datasource.url=jdbc:mysql://localhost:3306/evoting_db
+spring.datasource.username=root
+spring.datasource.password=YOUR_DB_PASSWORD
+spring.datasource.driver-class-name=com.mysql.cj.jdbc.Driver
+spring.jpa.hibernate.ddl-auto=update
+spring.jpa.show-sql=true
+server.port=8080
+twilio.account.sid=YOUR_TWILIO_SID
+twilio.auth.token=YOUR_TWILIO_AUTH_TOKEN
+twilio.phone.number=YOUR_TWILIO_PHONE
+jwt.secret=YOUR_JWT_SECRET
+jwt.expiration=900000
