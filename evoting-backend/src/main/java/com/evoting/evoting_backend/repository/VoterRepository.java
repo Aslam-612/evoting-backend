@@ -9,4 +9,6 @@ import java.util.Optional;
 public interface VoterRepository extends JpaRepository<Voter, Long> {
     Optional<Voter> findByMobile(String mobile);
     boolean existsByMobile(String mobile);
+    Optional<Voter> findByAadharNumber(String aadharNumber);
+    boolean existsByAadharNumber(String aadharNumber);
 }

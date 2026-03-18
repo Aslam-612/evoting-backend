@@ -32,4 +32,10 @@ public class Election {
     private LocalDateTime createdAt = LocalDateTime.now();
 
     private String description;
+
+    @Column(name = "constituency")
+    private String constituency;
+
+    @Column(name = "parties", length = 1000)
+    private String parties;
 }

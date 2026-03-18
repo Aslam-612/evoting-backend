@@ -19,6 +19,9 @@ public class Voter {
     @Column(nullable = false, unique = true)
     private String mobile;
 
+    @Column(name = "aadhar_number", unique = true)
+    private String aadharNumber;
+
     @Column(name = "voter_id_number")
     private String voterIdNumber;
 

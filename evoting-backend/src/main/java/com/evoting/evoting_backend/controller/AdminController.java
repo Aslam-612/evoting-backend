@@ -1,6 +1,8 @@
 package com.evoting.evoting_backend.controller;
 
+import org.springframework.web.multipart.MultipartFile;
 import com.evoting.evoting_backend.model.*;
+import com.evoting.evoting_backend.repository.VoterRepository;
 import com.evoting.evoting_backend.service.AdminService;
 import com.evoting.evoting_backend.service.JwtService;
 import jakarta.annotation.PostConstruct;
@@ -20,28 +22,20 @@ public class AdminController {
 
     private final AdminService adminService;
     private final JwtService jwtService;
+    private final VoterRepository voterRepository;
 
-    // Create default admin on startup
     @PostConstruct
     public void init() {
         adminService.createDefaultAdmin();
     }
 
-    // Admin login
     @PostMapping("/login")
     public ResponseEntity<Map<String, String>> login(
             @RequestBody Map<String, String> request) {
-
         Map<String, String> response = new HashMap<>();
-        String result = adminService.login(
-                request.get("username"),
-                request.get("password")
-        );
-
+        String result = adminService.login(request.get("username"), request.get("password"));
         if (result.equals("SUCCESS")) {
-            String token = jwtService.generateToken(
-                    request.get("username"), "ADMIN"
-            );
+            String token = jwtService.generateToken(request.get("username"), "ADMIN");
             response.put("status", "SUCCESS");
             response.put("token", token);
             response.put("message", "Admin login successful!");
@@ -53,22 +47,17 @@ public class AdminController {
         return ResponseEntity.ok(response);
     }
 
-    // Dashboard stats
     @GetMapping("/dashboard")
     public ResponseEntity<Map<String, Long>> getDashboard(
             @RequestHeader("Authorization") String authHeader) {
-        if (!isValidAdmin(authHeader))
-            return ResponseEntity.status(401).build();
+        if (!isValidAdmin(authHeader)) return ResponseEntity.status(401).build();
         return ResponseEntity.ok(adminService.getDashboardStats());
     }
-
-    // ── Voter Management ──────────────────────────────
 
     @GetMapping("/voters")
     public ResponseEntity<List<Voter>> getVoters(
             @RequestHeader("Authorization") String authHeader) {
-        if (!isValidAdmin(authHeader))
-            return ResponseEntity.status(401).build();
+        if (!isValidAdmin(authHeader)) return ResponseEntity.status(401).build();
         return ResponseEntity.ok(adminService.getAllVoters());
     }
 
@@ -76,8 +65,7 @@ public class AdminController {
     public ResponseEntity<Voter> addVoter(
             @RequestHeader("Authorization") String authHeader,
             @RequestBody Voter voter) {
-        if (!isValidAdmin(authHeader))
-            return ResponseEntity.status(401).build();
+        if (!isValidAdmin(authHeader)) return ResponseEntity.status(401).build();
         return ResponseEntity.ok(adminService.addVoter(voter));
     }
 
@@ -85,8 +73,7 @@ public class AdminController {
     public ResponseEntity<Map<String, String>> deleteVoter(
             @RequestHeader("Authorization") String authHeader,
             @PathVariable Long id) {
-        if (!isValidAdmin(authHeader))
-            return ResponseEntity.status(401).build();
+        if (!isValidAdmin(authHeader)) return ResponseEntity.status(401).build();
         adminService.deleteVoter(id);
         Map<String, String> response = new HashMap<>();
         response.put("status", "SUCCESS");
@@ -94,13 +81,104 @@ public class AdminController {
         return ResponseEntity.ok(response);
     }
 
-    // ── Election Management ───────────────────────────
+    @PostMapping("/voters/upload-csv")
+    public ResponseEntity<Map<String, String>> uploadCsv(
+            @RequestHeader("Authorization") String authHeader,
+            @RequestParam("file") MultipartFile file) {
+        if (!isValidAdmin(authHeader)) return ResponseEntity.status(401).build();
+        Map<String, String> response = new HashMap<>();
+        try {
+            String content = new String(file.getBytes()).trim();
+            String fileName = file.getOriginalFilename();
+            if (fileName == null || (!fileName.endsWith(".csv") && !fileName.endsWith(".xlsx") && !fileName.endsWith(".xls"))) {
+                response.put("status", "ERROR");
+                response.put("message", "Invalid file format. Please upload a CSV file only (.csv).");
+                return ResponseEntity.badRequest().body(response);
+            }
+            if (content.isEmpty()) {
+                response.put("status", "ERROR");
+                response.put("message", "The uploaded file is empty. Please provide a valid CSV file.");
+                return ResponseEntity.badRequest().body(response);
+            }
+
+            String[] lines = content.split("\n");
+            if (lines.length <= 1) {
+                response.put("status", "ERROR");
+                response.put("message", "No voters found in the file. Please check the CSV format.");
+                return ResponseEntity.badRequest().body(response);
+            }
+
+            int added = 0;
+            int skipped = 0;
+            int invalid = 0;
+
+            for (int i = 1; i < lines.length; i++) {
+                String line = lines[i].trim();
+                if (line.isEmpty()) continue;
+                String[] fields = line.split(",");
+                if (fields.length < 4) {
+                    invalid++;
+                    continue;
+                }
+
+                String name = fields[0].trim();
+                String aadhar = fields[1].trim();
+                String mobile = fields[2].trim();
+                String dob = fields[3].trim();
+
+                boolean mobileExists = voterRepository.existsByMobile(mobile);
+                boolean aadharExists = voterRepository.existsByAadharNumber(aadhar);
+
+                if (mobileExists || aadharExists) {
+                    skipped++;
+                    continue;
+                }
+
+                Voter voter = new Voter();
+                voter.setName(name);
+                voter.setAadharNumber(aadhar);
+                voter.setMobile(mobile);
+                voter.setDateOfBirth(dob);
+                voter.setHasVoted(false);
+                voter.setIsActive(true);
+                voterRepository.save(voter);
+                added++;
+            }
+
+            // Build response message based on results
+            if (added == 0 && skipped == 0 && invalid == 0) {
+                response.put("status", "ERROR");
+                response.put("message", "No valid voter data found in the file.");
+            } else if (added == 0 && skipped > 0) {
+                response.put("status", "INFO");
+                response.put("message", "No new voters added. All " + skipped + " voter(s) in the file are already registered.");
+            } else if (added > 0 && skipped == 0 && invalid == 0) {
+                response.put("status", "SUCCESS");
+                response.put("message", added + " voter(s) added successfully!");
+            } else if (added > 0 && skipped > 0) {
+                response.put("status", "SUCCESS");
+                response.put("message", added + " new voter(s) added. " + skipped + " voter(s) were already registered and skipped.");
+            } else if (added > 0 && invalid > 0) {
+                response.put("status", "SUCCESS");
+                response.put("message", added + " voter(s) added. " + invalid + " row(s) were skipped due to invalid format.");
+            } else {
+                response.put("status", "INFO");
+                response.put("message", "Processed file — Added: " + added + ", Already existed: " + skipped + ", Invalid rows: " + invalid);
+            }
+
+            return ResponseEntity.ok(response);
+
+        } catch (Exception e) {
+            response.put("status", "ERROR");
+            response.put("message", "CSV processing failed: " + e.getMessage());
+            return ResponseEntity.badRequest().body(response);
+        }
+    }
 
     @GetMapping("/elections")
     public ResponseEntity<List<Election>> getElections(
             @RequestHeader("Authorization") String authHeader) {
-        if (!isValidAdmin(authHeader))
-            return ResponseEntity.status(401).build();
+        if (!isValidAdmin(authHeader)) return ResponseEntity.status(401).build();
         return ResponseEntity.ok(adminService.getAllElections());
     }
 
@@ -108,8 +186,16 @@ public class AdminController {
     public ResponseEntity<Election> addElection(
             @RequestHeader("Authorization") String authHeader,
             @RequestBody Election election) {
-        if (!isValidAdmin(authHeader))
-            return ResponseEntity.status(401).build();
+        if (!isValidAdmin(authHeader)) return ResponseEntity.status(401).build();
+        return ResponseEntity.ok(adminService.addElection(election));
+    }
+    @PutMapping("/elections/{id}")
+    public ResponseEntity<Election> updateElection(
+            @RequestHeader("Authorization") String authHeader,
+            @PathVariable Long id,
+            @RequestBody Election election) {
+        if (!isValidAdmin(authHeader)) return ResponseEntity.status(401).build();
+        election.setId(id);
         return ResponseEntity.ok(adminService.addElection(election));
     }
 
@@ -118,19 +204,15 @@ public class AdminController {
             @RequestHeader("Authorization") String authHeader,
             @PathVariable Long id,
             @RequestBody Map<String, String> body) {
-        if (!isValidAdmin(authHeader))
-            return ResponseEntity.status(401).build();
-        return ResponseEntity.ok(
-                adminService.updateElectionStatus(id, body.get("status"))
-        );
+        if (!isValidAdmin(authHeader)) return ResponseEntity.status(401).build();
+        return ResponseEntity.ok(adminService.updateElectionStatus(id, body.get("status")));
     }
 
     @DeleteMapping("/elections/{id}")
     public ResponseEntity<Map<String, String>> deleteElection(
             @RequestHeader("Authorization") String authHeader,
             @PathVariable Long id) {
-        if (!isValidAdmin(authHeader))
-            return ResponseEntity.status(401).build();
+        if (!isValidAdmin(authHeader)) return ResponseEntity.status(401).build();
         adminService.deleteElection(id);
         Map<String, String> response = new HashMap<>();
         response.put("status", "SUCCESS");
@@ -138,13 +220,10 @@ public class AdminController {
         return ResponseEntity.ok(response);
     }
 
-    // ── Candidate Management ──────────────────────────
-
     @GetMapping("/candidates")
     public ResponseEntity<List<Candidate>> getCandidates(
             @RequestHeader("Authorization") String authHeader) {
-        if (!isValidAdmin(authHeader))
-            return ResponseEntity.status(401).build();
+        if (!isValidAdmin(authHeader)) return ResponseEntity.status(401).build();
         return ResponseEntity.ok(adminService.getAllCandidates());
     }
 
@@ -152,8 +231,16 @@ public class AdminController {
     public ResponseEntity<Candidate> addCandidate(
             @RequestHeader("Authorization") String authHeader,
             @RequestBody Candidate candidate) {
-        if (!isValidAdmin(authHeader))
-            return ResponseEntity.status(401).build();
+        if (!isValidAdmin(authHeader)) return ResponseEntity.status(401).build();
+        return ResponseEntity.ok(adminService.addCandidate(candidate));
+    }
+    @PutMapping("/candidates/{id}")
+    public ResponseEntity<Candidate> updateCandidate(
+            @RequestHeader("Authorization") String authHeader,
+            @PathVariable Long id,
+            @RequestBody Candidate candidate) {
+        if (!isValidAdmin(authHeader)) return ResponseEntity.status(401).build();
+        candidate.setId(id);
         return ResponseEntity.ok(adminService.addCandidate(candidate));
     }
 
@@ -161,8 +248,7 @@ public class AdminController {
     public ResponseEntity<Map<String, String>> deleteCandidate(
             @RequestHeader("Authorization") String authHeader,
             @PathVariable Long id) {
-        if (!isValidAdmin(authHeader))
-            return ResponseEntity.status(401).build();
+        if (!isValidAdmin(authHeader)) return ResponseEntity.status(401).build();
         adminService.deleteCandidate(id);
         Map<String, String> response = new HashMap<>();
         response.put("status", "SUCCESS");
@@ -170,18 +256,13 @@ public class AdminController {
         return ResponseEntity.ok(response);
     }
 
-    // ── Results ───────────────────────────────────────
-
     @GetMapping("/results/{electionId}")
     public ResponseEntity<List<Candidate>> getResults(
             @RequestHeader("Authorization") String authHeader,
             @PathVariable Long electionId) {
-        if (!isValidAdmin(authHeader))
-            return ResponseEntity.status(401).build();
+        if (!isValidAdmin(authHeader)) return ResponseEntity.status(401).build();
         return ResponseEntity.ok(adminService.getResults(electionId));
     }
-
-    // ── Helper ────────────────────────────────────────
 
     private boolean isValidAdmin(String authHeader) {
         try {

@@ -15,12 +15,29 @@ public class Candidate {
     @Column(nullable = false)
     private String name;
 
-    private String photo;
+    @Column
+    private Integer age;
 
-    private String description;
+    @Column
+    private String gender;
 
     @Column(name = "group_name")
     private String groupName;
+
+    @Column
+    private String constituency;
+
+    @Column
+    private String position;
+
+    @Column
+    private String phone;
+
+    @Column
+    private String photo;
+
+    @Column
+    private String description;
 
     @Column(name = "election_id", nullable = false)
     private Long electionId;
