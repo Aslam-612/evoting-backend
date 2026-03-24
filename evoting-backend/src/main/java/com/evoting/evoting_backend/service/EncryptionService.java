@@ -1,5 +1,6 @@
 package com.evoting.evoting_backend.service;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import javax.crypto.Cipher;
 import javax.crypto.SecretKey;
@@ -13,8 +14,11 @@ import java.util.Base64;
 @Service
 public class EncryptionService {
 
-    private static final String SECRET = "eVotingAES256SecretKey2025";
-    private static final String SALT   = "eVotingSalt2025";
+    @Value("${encryption.secret}")
+    private String SECRET;
+
+    @Value("${encryption.salt}")
+    private String SALT;
 
     private SecretKey generateKey() throws Exception {
         SecretKeyFactory factory = SecretKeyFactory
@@ -40,7 +44,6 @@ public class EncryptionService {
         cipher.init(Cipher.ENCRYPT_MODE, key, ivSpec);
         byte[] encrypted = cipher.doFinal(data.getBytes());
 
-        // Combine IV + encrypted data
         byte[] combined = new byte[iv.length + encrypted.length];
         System.arraycopy(iv, 0, combined, 0, iv.length);
         System.arraycopy(encrypted, 0, combined, iv.length, encrypted.length);
@@ -52,7 +55,6 @@ public class EncryptionService {
         SecretKey key = generateKey();
         byte[] combined = Base64.getDecoder().decode(encryptedData);
 
-        // Extract IV
         byte[] iv = new byte[16];
         byte[] encrypted = new byte[combined.length - 16];
         System.arraycopy(combined, 0, iv, 0, 16);

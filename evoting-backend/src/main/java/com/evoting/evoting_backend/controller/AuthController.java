@@ -15,8 +15,7 @@ import java.util.Optional;
 @RestController
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "*")
-public class AuthController {
+@CrossOrigin(origins = "http://localhost:8081")public class AuthController {
 
     private final OtpService otpService;
     private final JwtService jwtService;

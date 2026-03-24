@@ -3,6 +3,8 @@ package com.evoting.evoting_backend.service;
 import com.evoting.evoting_backend.model.OtpLog;
 import com.evoting.evoting_backend.repository.OtpLogRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.net.URI;
@@ -12,64 +14,61 @@ import java.net.http.HttpResponse;
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.util.Optional;
-import org.mindrot.jbcrypt.BCrypt;
-import org.springframework.beans.factory.annotation.Value;
 
 @Service
 @RequiredArgsConstructor
 public class OtpService {
 
     private final OtpLogRepository otpLogRepository;
+    private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
     @Value("${fast2sms.api.key}")
     private String FAST2SMS_API_KEY;
 
     public String generateAndSendOtp(String mobile) {
 
-        // Test bypass — OTP is always 123456 for this number
+        // Test bypass — OTP is always 123456 for test numbers
         if (mobile.equals("9000000000") || mobile.equals("8000000000")) {
             OtpLog otpLog = new OtpLog();
             otpLog.setMobile(mobile);
-            String hashedOtp = BCrypt.hashpw("123456", BCrypt.gensalt());
-            otpLog.setOtpHash(hashedOtp);
+            otpLog.setOtpHash(passwordEncoder.encode("123456"));
             otpLog.setExpiry(LocalDateTime.now().plusMinutes(30));
-            otpLog.setAttempts(1);
+            otpLog.setAttempts(0);
             otpLog.setStatus("PENDING");
             otpLogRepository.save(otpLog);
             System.out.println("🧪 TEST MODE: OTP for " + mobile + " is: 123456");
             return "SENT";
         }
 
-        // Generate 6-digit OTP
-        SecureRandom random = new SecureRandom();
-        String otp = String.format("%06d", random.nextInt(999999));
-
-        // Check attempt limit
+        // Check existing OTP log
         Optional<OtpLog> existing = otpLogRepository
                 .findTopByMobileOrderByCreatedAtDesc(mobile);
+
         if (existing.isPresent()) {
             OtpLog log = existing.get();
 
+            // Block rapid resend requests (30 second cooldown)
             if (log.getCreatedAt().isAfter(LocalDateTime.now().minusSeconds(30))) {
-                return "WAIT"; // block rapid requests
+                return "WAIT";
             }
-        }
 
-        if (existing.isPresent()) {
-            OtpLog log = existing.get();
+            // Block if max attempts reached within 5 minutes
             if (log.getAttempts() >= 3 &&
                     log.getCreatedAt().isAfter(LocalDateTime.now().minusMinutes(5))) {
                 return "MAX_ATTEMPTS";
             }
         }
 
-        // Save OTP log
+        // Generate 6-digit OTP
+        SecureRandom random = new SecureRandom();
+        String otp = String.format("%06d", random.nextInt(999999));
+
+        // Save hashed OTP log
         OtpLog otpLog = new OtpLog();
         otpLog.setMobile(mobile);
-        String hashedOtp = BCrypt.hashpw(otp, BCrypt.gensalt());
-        otpLog.setOtpHash(hashedOtp);
+        otpLog.setOtpHash(passwordEncoder.encode(otp));
         otpLog.setExpiry(LocalDateTime.now().plusMinutes(5));
-        otpLog.setAttempts(1);
+        otpLog.setAttempts(0);
         otpLog.setStatus("PENDING");
         otpLogRepository.save(otpLog);
 
@@ -111,35 +110,35 @@ public class OtpService {
 
         OtpLog log = otpLog.get();
 
-        System.out.println("STATUS: " + log.getStatus());
-        System.out.println("ATTEMPTS: " + log.getAttempts());
-        System.out.println("EXPIRY: " + log.getExpiry());
-        System.out.println("NOW: " + LocalDateTime.now());
-
+        // Already used
         if ("VERIFIED".equals(log.getStatus())) return false;
 
+        // Expired
         if (log.getExpiry().isBefore(LocalDateTime.now())) {
             log.setStatus("EXPIRED");
             otpLogRepository.save(log);
             return false;
         }
-        if (log.getAttempts() >= 5) {
-            log.setStatus("BLOCKED");
-            otpLogRepository.save(log);
-            return false;
-        }
-        System.out.println("Entered OTP: " + otp);
-        System.out.println("Stored Hash: " + log.getOtpHash());
-        System.out.println("Match: " + BCrypt.checkpw(otp, log.getOtpHash()));
-        if (BCrypt.checkpw(otp, log.getOtpHash())) {
+
+        // Already blocked
+        if ("BLOCKED".equals(log.getStatus())) return false;
+
+        // Correct OTP
+        if (passwordEncoder.matches(otp, log.getOtpHash())) {
             log.setStatus("VERIFIED");
             otpLogRepository.save(log);
             return true;
         }
 
+        // Wrong OTP — increment attempts
         log.setAttempts(log.getAttempts() + 1);
+
+        // Block after 3 wrong attempts
+        if (log.getAttempts() >= 3) {
+            log.setStatus("BLOCKED");
+        }
+
         otpLogRepository.save(log);
         return false;
-
     }
 }
