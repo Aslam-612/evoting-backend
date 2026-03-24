@@ -12,6 +12,7 @@ import java.net.http.HttpResponse;
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.util.Optional;
+import org.mindrot.jbcrypt.BCrypt;
 
 @Service
 @RequiredArgsConstructor
@@ -27,7 +28,8 @@ public class OtpService {
         if (mobile.equals("9000000000") || mobile.equals("8000000000")) {
             OtpLog otpLog = new OtpLog();
             otpLog.setMobile(mobile);
-            otpLog.setOtpHash("123456");
+            String hashedOtp = BCrypt.hashpw("123456", BCrypt.gensalt());
+            otpLog.setOtpHash(hashedOtp);
             otpLog.setExpiry(LocalDateTime.now().plusMinutes(30));
             otpLog.setAttempts(1);
             otpLog.setStatus("PENDING");
@@ -43,6 +45,13 @@ public class OtpService {
         // Check attempt limit
         Optional<OtpLog> existing = otpLogRepository
                 .findTopByMobileOrderByCreatedAtDesc(mobile);
+        if (existing.isPresent()) {
+            OtpLog log = existing.get();
+
+            if (log.getCreatedAt().isAfter(LocalDateTime.now().minusSeconds(30))) {
+                return "WAIT"; // block rapid requests
+            }
+        }
 
         if (existing.isPresent()) {
             OtpLog log = existing.get();
@@ -55,7 +64,8 @@ public class OtpService {
         // Save OTP log
         OtpLog otpLog = new OtpLog();
         otpLog.setMobile(mobile);
-        otpLog.setOtpHash(otp);
+        String hashedOtp = BCrypt.hashpw(otp, BCrypt.gensalt());
+        otpLog.setOtpHash(hashedOtp);
         otpLog.setExpiry(LocalDateTime.now().plusMinutes(5));
         otpLog.setAttempts(1);
         otpLog.setStatus("PENDING");
@@ -99,13 +109,27 @@ public class OtpService {
 
         OtpLog log = otpLog.get();
 
+        System.out.println("STATUS: " + log.getStatus());
+        System.out.println("ATTEMPTS: " + log.getAttempts());
+        System.out.println("EXPIRY: " + log.getExpiry());
+        System.out.println("NOW: " + LocalDateTime.now());
+
+        if ("VERIFIED".equals(log.getStatus())) return false;
+
         if (log.getExpiry().isBefore(LocalDateTime.now())) {
             log.setStatus("EXPIRED");
             otpLogRepository.save(log);
             return false;
         }
-
-        if (log.getOtpHash().equals(otp)) {
+        if (log.getAttempts() >= 5) {
+            log.setStatus("BLOCKED");
+            otpLogRepository.save(log);
+            return false;
+        }
+        System.out.println("Entered OTP: " + otp);
+        System.out.println("Stored Hash: " + log.getOtpHash());
+        System.out.println("Match: " + BCrypt.checkpw(otp, log.getOtpHash()));
+        if (BCrypt.checkpw(otp, log.getOtpHash())) {
             log.setStatus("VERIFIED");
             otpLogRepository.save(log);
             return true;
@@ -114,5 +138,6 @@ public class OtpService {
         log.setAttempts(log.getAttempts() + 1);
         otpLogRepository.save(log);
         return false;
+
     }
 }

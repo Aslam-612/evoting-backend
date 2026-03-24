@@ -154,6 +154,7 @@ public class AdminController {
             int added = 0;
             int skipped = 0;
             int invalid = 0;
+            int underage = 0;
 
             for (int i = 1; i < lines.length; i++) {
                 String line = lines[i].trim();
@@ -182,7 +183,7 @@ public class AdminController {
                     java.time.LocalDate dateOfBirth = java.time.LocalDate.parse(dob);
                     int age = java.time.Period.between(dateOfBirth, java.time.LocalDate.now()).getYears();
                     if (age < 18) {
-                        invalid++;
+                        underage++;
                         continue;
                     }
                 } catch (Exception e) {
@@ -205,24 +206,42 @@ public class AdminController {
             }
 
             // Build response message based on results
-            if (added == 0 && skipped == 0 && invalid == 0) {
+            if (added == 0 && skipped == 0 && invalid == 0 && underage == 0) {
                 response.put("status", "ERROR");
                 response.put("message", "No valid voter data found in the file.");
-            } else if (added == 0 && skipped > 0) {
+
+            } else if (added == 0 && skipped > 0 && underage == 0 && invalid == 0) {
                 response.put("status", "INFO");
                 response.put("message", "No new voters added. All " + skipped + " voter(s) in the file are already registered.");
-            } else if (added > 0 && skipped == 0 && invalid == 0) {
+
+            } else if (added == 0 && underage > 0 && skipped == 0) {
+                response.put("status", "INFO");
+                response.put("message", "No voters added. " + underage + " voter(s) were under 18 and skipped.");
+
+            } else if (added > 0 && skipped == 0 && invalid == 0 && underage == 0) {
                 response.put("status", "SUCCESS");
                 response.put("message", added + " voter(s) added successfully!");
-            } else if (added > 0 && skipped > 0) {
+
+            } else if (added > 0 && skipped > 0 && underage == 0 && invalid == 0) {
                 response.put("status", "SUCCESS");
                 response.put("message", added + " new voter(s) added. " + skipped + " voter(s) were already registered and skipped.");
-            } else if (added > 0 && invalid > 0) {
+
+            } else if (added > 0 && invalid > 0 && underage == 0) {
                 response.put("status", "SUCCESS");
                 response.put("message", added + " voter(s) added. " + invalid + " row(s) were skipped due to invalid format.");
+
+            } else if (added > 0 && underage > 0 && skipped == 0 && invalid == 0) {
+                response.put("status", "SUCCESS");
+                response.put("message", added + " voter(s) added. " + underage + " underage voter(s) were skipped.");
+
             } else {
                 response.put("status", "INFO");
-                response.put("message", "Processed file — Added: " + added + ", Already existed: " + skipped + ", Invalid rows: " + invalid);
+                response.put("message",
+                        "Processed file — Added: " + added +
+                                ", Already existed: " + skipped +
+                                ", Underage: " + underage +
+                                ", Invalid rows: " + invalid
+                );
             }
 
             return ResponseEntity.ok(response);
