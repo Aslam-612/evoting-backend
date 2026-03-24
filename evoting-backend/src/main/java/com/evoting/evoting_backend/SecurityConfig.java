@@ -35,6 +35,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/voting/elections").permitAll()
                         .requestMatchers("/api/voting/elections/**").permitAll()
                         .requestMatchers("/api/admin/login").permitAll()
+                        .requestMatchers("/api/public/**").permitAll()
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);

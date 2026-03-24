@@ -9,6 +9,7 @@ import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import com.evoting.evoting_backend.repository.CandidateRepository;
 
 import java.util.HashMap;
 import java.util.List;
@@ -23,6 +24,7 @@ public class AdminController {
     private final AdminService adminService;
     private final JwtService jwtService;
     private final VoterRepository voterRepository;
+    private final CandidateRepository candidateRepository;
 
     @PostConstruct
     public void init() {
