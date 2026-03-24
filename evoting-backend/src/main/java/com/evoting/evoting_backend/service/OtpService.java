@@ -13,6 +13,7 @@ import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.util.Optional;
 import org.mindrot.jbcrypt.BCrypt;
+import org.springframework.beans.factory.annotation.Value;
 
 @Service
 @RequiredArgsConstructor
@@ -20,7 +21,8 @@ public class OtpService {
 
     private final OtpLogRepository otpLogRepository;
 
-    private static final String FAST2SMS_API_KEY = "VCEbJjSKqyLD1P9Bd5UWe7MohtazsTYwk2p3xiIrGAQHfFl6Z4SIEgqX4CcjNlLFG3JoeQBADanO1yMv";
+    @Value("${fast2sms.api.key}")
+    private String FAST2SMS_API_KEY;
 
     public String generateAndSendOtp(String mobile) {
 
