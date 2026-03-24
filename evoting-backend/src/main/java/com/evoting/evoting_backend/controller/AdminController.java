@@ -60,6 +60,49 @@ public class AdminController {
         if (!isValidAdmin(authHeader)) return ResponseEntity.status(401).build();
         return ResponseEntity.ok(adminService.getAllVoters());
     }
+    @GetMapping("/voters/states")
+    public ResponseEntity<List<String>> getStates(
+            @RequestHeader("Authorization") String authHeader) {
+        if (!isValidAdmin(authHeader)) return ResponseEntity.status(401).build();
+        return ResponseEntity.ok(voterRepository.findDistinctStates());
+    }
+
+    @GetMapping("/voters/cities")
+    public ResponseEntity<List<String>> getCities(
+            @RequestHeader("Authorization") String authHeader,
+            @RequestParam(required = false) String state) {
+        if (!isValidAdmin(authHeader)) return ResponseEntity.status(401).build();
+        if (state != null && !state.isEmpty())
+            return ResponseEntity.ok(voterRepository.findDistinctCitiesByState(state));
+        return ResponseEntity.ok(voterRepository.findDistinctCities());
+    }
+    @GetMapping("/voters/constituencies")
+    public ResponseEntity<List<String>> getConstituencies(
+            @RequestHeader("Authorization") String authHeader,
+            @RequestParam(required = false) String city) {
+        if (!isValidAdmin(authHeader)) return ResponseEntity.status(401).build();
+        if (city != null && !city.isEmpty())
+            return ResponseEntity.ok(voterRepository.findDistinctConstituenciesByCity(city));
+        return ResponseEntity.ok(voterRepository.findDistinctConstituencies());
+    }
+
+    @GetMapping("/voters/filter")
+    public ResponseEntity<List<Voter>> filterVoters(
+            @RequestHeader("Authorization") String authHeader,
+            @RequestParam(required = false) String state,
+            @RequestParam(required = false) String city,
+            @RequestParam(required = false) String constituency) {
+        if (!isValidAdmin(authHeader)) return ResponseEntity.status(401).build();
+        if (state != null && !state.isEmpty() && city != null && !city.isEmpty() && constituency != null && !constituency.isEmpty())
+            return ResponseEntity.ok(voterRepository.findByStateAndCityAndConstituency(state, city, constituency));
+        if (state != null && !state.isEmpty() && city != null && !city.isEmpty())
+            return ResponseEntity.ok(voterRepository.findByStateAndCity(state, city));
+        if (state != null && !state.isEmpty())
+            return ResponseEntity.ok(voterRepository.findByState(state));
+        if (constituency != null && !constituency.isEmpty())
+            return ResponseEntity.ok(voterRepository.findByConstituency(constituency));
+        return ResponseEntity.ok(voterRepository.findAll());
+    }
 
     @PostMapping("/voters")
     public ResponseEntity<Voter> addVoter(
@@ -139,6 +182,9 @@ public class AdminController {
                 voter.setAadharNumber(aadhar);
                 voter.setMobile(mobile);
                 voter.setDateOfBirth(dob);
+                if (fields.length > 4) voter.setState(fields[4].trim());
+                if (fields.length > 5) voter.setCity(fields[5].trim());
+                if (fields.length > 6) voter.setConstituency(fields[6].trim());
                 voter.setHasVoted(false);
                 voter.setIsActive(true);
                 voterRepository.save(voter);

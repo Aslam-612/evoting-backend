@@ -78,6 +78,18 @@ public class VotingController {
                     response.put("status", "ERROR");
                     response.put("message", "Invalid candidate for this election.");
                 }
+                case "WRONG_STATE" -> {
+                    response.put("status", "ERROR");
+                    response.put("message", "You are not eligible to vote in this election. This election is for a different state.");
+                }
+                case "WRONG_CITY" -> {
+                    response.put("status", "ERROR");
+                    response.put("message", "You are not eligible. This election is for a different city.");
+                }
+                case "WRONG_CONSTITUENCY" -> {
+                    response.put("status", "ERROR");
+                    response.put("message", "You can only vote for candidates in your own constituency.");
+                }
                 default -> {
                     response.put("status", "SUCCESS");
                     response.put("message", "Vote cast successfully!");

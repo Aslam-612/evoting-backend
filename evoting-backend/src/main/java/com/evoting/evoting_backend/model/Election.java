@@ -36,6 +36,6 @@ public class Election {
     @Column(name = "constituency")
     private String constituency;
 
-    @Column(name = "parties", length = 1000)
+    @Column(name = "parties", columnDefinition = "LONGTEXT")
     private String parties;
 }

@@ -22,6 +22,15 @@ public class Voter {
     @Column(name = "aadhar_number", unique = true)
     private String aadharNumber;
 
+    @Column
+    private String state;
+
+    @Column
+    private String city;
+
+    @Column
+    private String constituency;
+
     @Column(name = "voter_id_number")
     private String voterIdNumber;
 
@@ -39,4 +48,6 @@ public class Voter {
 
     @Column(name = "is_active")
     private Boolean isActive = true;
+
+
 }

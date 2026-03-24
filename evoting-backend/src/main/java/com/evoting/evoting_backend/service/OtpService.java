@@ -23,6 +23,19 @@ public class OtpService {
 
     public String generateAndSendOtp(String mobile) {
 
+        // Test bypass — OTP is always 123456 for this number
+        if (mobile.equals("9000000000") || mobile.equals("8000000000")) {
+            OtpLog otpLog = new OtpLog();
+            otpLog.setMobile(mobile);
+            otpLog.setOtpHash("123456");
+            otpLog.setExpiry(LocalDateTime.now().plusMinutes(30));
+            otpLog.setAttempts(1);
+            otpLog.setStatus("PENDING");
+            otpLogRepository.save(otpLog);
+            System.out.println("🧪 TEST MODE: OTP for " + mobile + " is: 123456");
+            return "SENT";
+        }
+
         // Generate 6-digit OTP
         SecureRandom random = new SecureRandom();
         String otp = String.format("%06d", random.nextInt(999999));
