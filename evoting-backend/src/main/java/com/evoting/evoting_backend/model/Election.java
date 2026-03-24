@@ -38,4 +38,7 @@ public class Election {
 
     @Column(name = "parties", columnDefinition = "LONGTEXT")
     private String parties;
+
+    @Column(columnDefinition = "LONGTEXT")
+    private String stateEmblem;
 }

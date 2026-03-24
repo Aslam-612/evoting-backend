@@ -75,7 +75,20 @@ public class AuthController {
             response.put("message", "Invalid or expired OTP.");
             return ResponseEntity.badRequest().body(response);
         }
-
+        // Check voter age - must be 18+
+        if (voter.getDateOfBirth() != null) {
+            try {
+                java.time.LocalDate dob = java.time.LocalDate.parse(voter.getDateOfBirth());
+                int age = java.time.Period.between(dob, java.time.LocalDate.now()).getYears();
+                if (age < 18) {
+                    response.put("status", "ERROR");
+                    response.put("message", "You must be 18 or older to vote.");
+                    return ResponseEntity.badRequest().body(response);
+                }
+            } catch (Exception e) {
+                System.out.println("DOB parse error: " + e.getMessage());
+            }
+        }
         String token = jwtService.generateToken(mobile, "VOTER");
         response.put("status", "SUCCESS");
         response.put("token", token);

@@ -177,6 +177,19 @@ public class AdminController {
                     continue;
                 }
 
+// Age validation - must be 18+
+                try {
+                    java.time.LocalDate dateOfBirth = java.time.LocalDate.parse(dob);
+                    int age = java.time.Period.between(dateOfBirth, java.time.LocalDate.now()).getYears();
+                    if (age < 18) {
+                        invalid++;
+                        continue;
+                    }
+                } catch (Exception e) {
+                    invalid++;
+                    continue;
+                }
+
                 Voter voter = new Voter();
                 voter.setName(name);
                 voter.setAadharNumber(aadhar);

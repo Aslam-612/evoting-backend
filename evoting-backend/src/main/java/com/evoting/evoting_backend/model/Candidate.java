@@ -44,4 +44,7 @@ public class Candidate {
 
     @Column(name = "vote_count")
     private Long voteCount = 0L;
+
+    @Column(name = "date_of_birth")
+    private java.time.LocalDate dateOfBirth;
 }
